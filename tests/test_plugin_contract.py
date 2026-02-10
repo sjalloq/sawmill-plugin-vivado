@@ -7,6 +7,8 @@ immediately after generation.
 
 from __future__ import annotations
 
+import re
+
 from sawmill.plugin import SawmillPlugin
 
 
@@ -83,8 +85,8 @@ class TestPluginAttributes:
         assert plugin.name == "vivado"
 
     def test_has_version(self, plugin):
-        """Plugin should have a version attribute."""
-        assert plugin.version == "1.0.0"
+        """Plugin should have a valid semver-style version."""
+        assert re.match(r"^\d+\.\d+\.\d+", plugin.version)
 
     def test_has_description(self, plugin):
         """Plugin should have a description attribute."""

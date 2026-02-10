@@ -79,20 +79,20 @@ The plugin identifies Vivado logs by checking (in order of confidence):
 3. **Severity pattern density** (5+ matching lines) — 0.6
 4. **Filename contains "vivado"** — 0.4
 
-## Built-in Filters
+## Domain-Specific Filters
 
-| Filter | Pattern | Default |
-|--------|---------|---------|
-| Errors | `^ERROR:` | on |
-| Critical Warnings | `^CRITICAL WARNING:` | on |
-| Warnings | `^WARNING:` | on |
-| Info | `^INFO:` | off |
-| Timing Issues | `timing\|slack\|WNS\|TNS\|setup\|hold` | off |
-| Synthesis | `[Synth ...]` | off |
-| DRC | `[DRC ...]` | off |
-| Constraints | `[Constraints ...]` | off |
-| IP Flow | `[IP_Flow ...]` | off |
-| Routing | `[Route ...]` | off |
+These filters let you focus on specific Vivado subsystems. Severity filtering
+(errors, warnings, etc.) is handled by sawmill's built-in `--severity` flag and
+TUI severity toggles.
+
+| Filter | Pattern | Description |
+|--------|---------|-------------|
+| Timing Issues | `(timing\|slack\|WNS\|TNS\|setup\|hold)` | Timing-related messages |
+| Synthesis | `\[Synth \d+-\d+\]` | Synthesis messages |
+| DRC | `\[DRC \d+-\d+\]` | Design Rule Check messages |
+| Constraints | `\[Constraints \d+-\d+\]` | Constraint-related messages |
+| IP Flow | `\[IP_Flow \d+-\d+\]` | IP core generation messages |
+| Routing | `\[Route \d+-\d+\]` | Routing messages |
 
 ## How It Works
 

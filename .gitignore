@@ -6,6 +6,7 @@ __pycache__/
 dist/
 build/
 src/*.egg-info/
+src/sawmill_plugin_vivado/_version.py
 
 # Virtual environments
 .venv/
