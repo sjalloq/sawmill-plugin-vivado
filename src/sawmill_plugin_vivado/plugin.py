@@ -6,6 +6,7 @@ including severity, message IDs, and file references.
 
 from __future__ import annotations
 
+from importlib.metadata import version
 from pathlib import Path
 
 from sawmill.models.filter_def import FilterDefinition
@@ -36,7 +37,7 @@ class VivadoPlugin(SawmillPlugin):
     """
 
     name = "vivado"
-    version = "1.0.0"
+    version = version("sawmill-plugin-vivado")
     description = "Parser for Xilinx Vivado synthesis and implementation logs"
 
     @hookimpl

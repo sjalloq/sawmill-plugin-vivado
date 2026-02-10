@@ -1,10 +1,10 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
 name = "sawmill-plugin-vivado"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Sawmill plugin for Xilinx Vivado synthesis and implementation logs"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -26,6 +26,12 @@ dev = [
 
 [project.entry-points."sawmill.plugins"]
 vivado = "sawmill_plugin_vivado:VivadoPlugin"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/sawmill_plugin_vivado/_version.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/sawmill_plugin_vivado"]
