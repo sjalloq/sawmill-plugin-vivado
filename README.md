@@ -1,46 +1,119 @@
 # sawmill-plugin-vivado
 
-Sawmill plugin for Xilinx Vivado synthesis and implementation logs
+A Sawmill plugin for parsing Xilinx Vivado synthesis, implementation, and bitstream logs.
 
-## Quick Start
+See [Sawmill](https://github.com/sjalloq/sawmill) for more info.
+
+## Installation
 
 ```bash
-# Install in development mode
-make install
-
-# Run tests
-make test
-
-# Lint
-make lint
+[uv] pip install git+https://github.com/sjalloq/sawmill-plugin-vivado.git
 ```
 
-## Development
+Or for development:
 
-Start by filling in the TODO items in `src/sawmill_plugin_vivado/plugin.py`.
-Work on hooks in this order:
+```bash
+git clone https://github.com/sjalloq/sawmill-plugin-vivado.git
+cd sawmill-plugin-vivado
+make install
+```
 
-1. **`get_severity_levels`** — Define your tool's severity levels (already has a working default)
-2. **`can_handle`** — Detect your tool's log files by name or content
-3. **`load_and_parse`** — Parse log files into Message objects
-4. **`get_filters`** — Add pre-defined filters for common patterns
-5. **`extract_file_reference`** — Extract source file references from messages
-6. **`get_grouping_fields`** — Add custom grouping dimensions (optional)
+Confirm it's registered:
 
-Add real log output to `examples/sample.log` to use in tests.
+```bash
+sawmill --list-plugins
+```
 
-## How Sawmill Finds Your Plugin
+## Usage
 
-Sawmill discovers plugins via Python entry points. The entry point is
-declared in `pyproject.toml` under `[project.entry-points."sawmill.plugins"]`.
-Running `pip install -e .` registers it. Confirm with `sawmill --list-plugins`.
+```bash
+# Launch the TUI on a Vivado log
+sawmill vivado.log
+
+# Filter to errors and critical warnings only
+sawmill vivado.log --severity error
+sawmill vivado.log --severity critical_warning
+
+# CI mode — fail on warnings and above
+sawmill vivado.log --check
+
+# Fail only on errors
+sawmill vivado.log --check --fail-on error
+```
+
+## What It Parses
+
+Vivado logs use this message format:
+
+```
+TYPE: [Category ID-Number] message text [/path/to/file.v:line]
+```
+
+For example:
+
+```
+INFO: [Synth 8-6157] synthesizing module 'top' [/src/top.v:53]
+WARNING: [Vivado 12-3523] Attempt to change 'name' is not allowed
+CRITICAL WARNING: [Constraints 18-4427] Constraint override warning
+ERROR: [Route 35-9] Routing failed
+```
+
+The plugin handles multi-line messages (indented continuation lines, tables)
+and extracts file references from both `[/path:line]` and `/path:line` formats.
+
+## Severity Levels
+
+| ID | Name | Level | Style |
+|----|------|-------|-------|
+| `error` | Error | 3 | red bold |
+| `critical_warning` | Critical Warning | 2 | red |
+| `warning` | Warning | 1 | yellow |
+| `info` | Info | 0 | cyan |
+
+## Detection
+
+The plugin identifies Vivado logs by checking (in order of confidence):
+
+1. **Vivado header** (`# Vivado v2025.2 ...`) — 0.95
+2. **Multiple Vivado message IDs** (Synth, DRC, Timing, etc.) — 0.85
+3. **Severity pattern density** (5+ matching lines) — 0.6
+4. **Filename contains "vivado"** — 0.4
+
+## Built-in Filters
+
+| Filter | Pattern | Default |
+|--------|---------|---------|
+| Errors | `^ERROR:` | on |
+| Critical Warnings | `^CRITICAL WARNING:` | on |
+| Warnings | `^WARNING:` | on |
+| Info | `^INFO:` | off |
+| Timing Issues | `timing\|slack\|WNS\|TNS\|setup\|hold` | off |
+| Synthesis | `[Synth ...]` | off |
+| DRC | `[DRC ...]` | off |
+| Constraints | `[Constraints ...]` | off |
+| IP Flow | `[IP_Flow ...]` | off |
+| Routing | `[Route ...]` | off |
+
+## How It Works
+
+Sawmill discovers plugins via Python entry points. This plugin declares its
+entry point in `pyproject.toml`:
+
+```toml
+[project.entry-points."sawmill.plugins"]
+vivado = "sawmill_plugin_vivado:VivadoPlugin"
+```
+
+Running `pip install -e .` registers it. Sawmill calls `can_handle()` on each
+plugin to auto-detect which one should parse a given log file.
 
 ## Testing
 
 ```bash
-make test
+make test    # 46 tests
+make lint    # ruff check + format
 ```
 
-Tests are in `tests/`. The contract tests (`test_plugin_contract.py`)
-validate plugin structure and pass immediately. The other tests will
-start passing as you implement the plugin hooks.
+## Notes
+
+* Does the wider Xilinx toolset use the same log style?  Would this work for Vitis et al?
