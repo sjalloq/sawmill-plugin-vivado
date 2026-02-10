@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sawmill-plugin-vivado"
+version = "0.1.0"
+description = "Sawmill plugin for Xilinx Vivado synthesis and implementation logs"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Shareef Jalloq"}
+]
+keywords = ["sawmill", "plugin", "vivado", "eda", "log"]
+
+dependencies = [
+    "sawmill>=0.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "ruff>=0.4.0",
+]
+
+[project.entry-points."sawmill.plugins"]
+vivado = "sawmill_plugin_vivado:VivadoPlugin"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sawmill_plugin_vivado"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.sawmill]
+plugin_api = "1"
