@@ -12,18 +12,18 @@ class TestLoadAndParse:
 
     def test_returns_list(self, plugin, sample_log):
         """load_and_parse should return a list."""
-        result = plugin.load_and_parse(sample_log)
+        result = list(plugin.load_and_parse(sample_log))
         assert isinstance(result, list)
 
     def test_items_are_messages(self, plugin, sample_log):
         """Each item should be a Message instance."""
-        messages = plugin.load_and_parse(sample_log)
+        messages = list(plugin.load_and_parse(sample_log))
         for msg in messages:
             assert isinstance(msg, Message), f"Expected Message, got {type(msg)}"
 
     def test_messages_have_required_fields(self, plugin, sample_log):
         """Each message should have start_line, raw_text, and content populated."""
-        messages = plugin.load_and_parse(sample_log)
+        messages = list(plugin.load_and_parse(sample_log))
         for msg in messages:
             assert msg.start_line >= 1, "start_line should be >= 1"
             assert msg.raw_text, "raw_text should not be empty"
@@ -36,7 +36,7 @@ class TestLoadAndParse:
             "WARNING: [Vivado 12-3523] Component name change\n"
             "INFO: [Synth 8-1] Done\n"
         )
-        messages = plugin.load_and_parse(log_file)
+        messages = list(plugin.load_and_parse(log_file))
         assert len(messages) == 2
         assert messages[0].severity == "warning"
         assert messages[0].message_id == "Vivado 12-3523"
@@ -46,7 +46,7 @@ class TestLoadAndParse:
         """Plugin should correctly parse critical warnings."""
         log_file = tmp_path / "vivado.log"
         log_file.write_text("CRITICAL WARNING: [Constraints 18-4427] Override warning\n")
-        messages = plugin.load_and_parse(log_file)
+        messages = list(plugin.load_and_parse(log_file))
         assert len(messages) == 1
         assert messages[0].severity == "critical_warning"
         assert messages[0].message_id == "Constraints 18-4427"
@@ -55,7 +55,7 @@ class TestLoadAndParse:
         """Plugin should correctly parse errors."""
         log_file = tmp_path / "vivado.log"
         log_file.write_text("ERROR: [Route 35-9] Routing failed\n")
-        messages = plugin.load_and_parse(log_file)
+        messages = list(plugin.load_and_parse(log_file))
         assert len(messages) == 1
         assert messages[0].severity == "error"
         assert messages[0].message_id == "Route 35-9"
@@ -69,7 +69,7 @@ class TestLoadAndParse:
             "  and another line\n"
             "INFO: [Synth 8-1] Next message\n"
         )
-        messages = plugin.load_and_parse(log_file)
+        messages = list(plugin.load_and_parse(log_file))
         assert len(messages) == 2
         assert messages[0].start_line == 1
         assert messages[0].end_line >= 3
@@ -79,7 +79,7 @@ class TestLoadAndParse:
         """Plugin should extract category from message ID."""
         log_file = tmp_path / "vivado.log"
         log_file.write_text("INFO: [Synth 8-6157] synthesizing module\n")
-        messages = plugin.load_and_parse(log_file)
+        messages = list(plugin.load_and_parse(log_file))
         assert len(messages) == 1
         assert messages[0].category == "synth"
 
@@ -87,7 +87,7 @@ class TestLoadAndParse:
         """Plugin should extract message content without prefix."""
         log_file = tmp_path / "vivado.log"
         log_file.write_text("WARNING: [Vivado 12-3523] Component name change attempted\n")
-        messages = plugin.load_and_parse(log_file)
+        messages = list(plugin.load_and_parse(log_file))
         assert len(messages) == 1
         assert "Component name change attempted" in messages[0].content
         assert not messages[0].content.startswith("WARNING")
@@ -102,7 +102,7 @@ class TestLoadAndParse:
             "Plain text between messages\n"
             "WARNING: [Vivado 12-3523] Second message\n"
         )
-        messages = plugin.load_and_parse(log_file)
+        messages = list(plugin.load_and_parse(log_file))
         assert len(messages) == 2
         assert messages[0].severity == "info"
         assert messages[1].severity == "warning"
@@ -111,16 +111,33 @@ class TestLoadAndParse:
         """An empty file should return an empty list."""
         empty = tmp_path / "empty.log"
         empty.write_text("")
-        assert plugin.load_and_parse(empty) == []
+        assert list(plugin.load_and_parse(empty)) == []
+
+    def test_missing_file_gives_empty_iterator(self, plugin, tmp_path):
+        """A missing path returns an empty Iterator without raising."""
+        from collections.abc import Iterator
+
+        result = plugin.load_and_parse(tmp_path / "nonexistent.log")
+        assert isinstance(result, Iterator)
+        assert next(result, None) is None
+
+    def test_file_opened_eagerly(self, plugin, tmp_path):
+        """The file is opened on call, not on first next()."""
+        log = tmp_path / "eager.log"
+        log.write_text("INFO: [Synth 8-1] hello\n")
+        result = plugin.load_and_parse(log)
+        log.unlink()
+        msgs = list(result)
+        assert len(msgs) == 1
 
     def test_missing_file_returns_empty_list(self, plugin, tmp_path):
         """A non-existent file should return an empty list."""
         missing = tmp_path / "nonexistent.log"
-        assert plugin.load_and_parse(missing) == []
+        assert list(plugin.load_and_parse(missing)) == []
 
     def test_parses_real_log(self, plugin, vivado_log):
         """Plugin should parse the real Vivado log file."""
-        messages = plugin.load_and_parse(vivado_log)
+        messages = list(plugin.load_and_parse(vivado_log))
         assert len(messages) > 100
         severities = {m.severity for m in messages}
         assert "info" in severities
@@ -128,7 +145,7 @@ class TestLoadAndParse:
 
     def test_extracts_file_refs_from_real_log(self, plugin, vivado_log):
         """Plugin should extract file references from real log."""
-        messages = plugin.load_and_parse(vivado_log)
+        messages = list(plugin.load_and_parse(vivado_log))
         messages_with_refs = [m for m in messages if m.file_ref is not None]
         assert len(messages_with_refs) > 0
         for m in messages_with_refs[:5]:

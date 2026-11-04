@@ -6,8 +6,10 @@ including severity, message IDs, and file references.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from importlib.metadata import version
 from pathlib import Path
+from typing import TextIO
 
 from sawmill.models.filter_def import FilterDefinition
 from sawmill.models.message import FileRef, Message
@@ -100,75 +102,71 @@ class VivadoPlugin(SawmillPlugin):
             return 0.0
 
     @hookimpl
-    def load_and_parse(self, path: Path) -> list[Message]:
-        """Load and parse a Vivado log file.
+    def load_and_parse(self, path: Path) -> Iterator[Message]:
+        """Stream a Vivado log file as parsed messages.
 
-        Parses the log file, extracting messages with severity, IDs, and
-        file references. Groups multi-line messages appropriately.
+        Reads the file line-by-line so memory stays O(one in-flight
+        multi-line message), independent of file size.
 
-        Args:
-            path: Path to the Vivado log file.
-
-        Returns:
-            List of Message objects.
+        Yields:
+            Message objects with severity, message ID, category and file ref.
         """
         if not path.exists():
-            return []
-
-        messages: list[Message] = []
+            return iter(())
 
         try:
-            with open(path, encoding="utf-8", errors="replace") as f:
-                lines = f.readlines()
-        except Exception:
-            return []
+            f = open(path, encoding="utf-8", errors="replace")
+        except OSError:
+            return iter(())
 
-        if not lines:
-            return []
+        return self._iter_messages(f)
 
-        i = 0
-        while i < len(lines):
-            line = lines[i]
-            severity = self._detect_severity(line)
+    def _iter_messages(self, f: TextIO) -> Iterator[Message]:
+        """Yield messages from an open file handle, closing it when done."""
+        primary_line: str | None = None
+        primary_severity: str | None = None
+        primary_start: int = 0
+        cont_lines: list[str] = []
 
-            if severity:
-                # Found a message start
-                start_line = i + 1  # 1-indexed
-                raw_lines = [line]
+        def _build() -> Message:
+            raw_text = "".join([primary_line, *cont_lines]).rstrip("\n")
+            message_id = self._extract_message_id(primary_line)
+            content = self._extract_content(primary_line, primary_severity)
+            file_ref = self.extract_file_reference(raw_text)
+            category = self._extract_category(message_id)
+            end_line = primary_start + len(cont_lines)
+            return Message(
+                start_line=primary_start,
+                end_line=end_line,
+                raw_text=raw_text,
+                content=content,
+                severity=primary_severity,
+                message_id=message_id,
+                category=category,
+                file_ref=file_ref,
+            )
 
-                # Look for continuation lines
-                j = i + 1
-                while j < len(lines) and self._is_continuation(lines[j]):
-                    raw_lines.append(lines[j])
-                    j += 1
+        try:
+            for line_num, line in enumerate(f, 1):
+                if primary_line is not None and self._is_continuation(line):
+                    cont_lines.append(line)
+                    continue
 
-                end_line = j  # 1-indexed (exclusive becomes inclusive)
-                raw_text = "".join(raw_lines).rstrip("\n")
+                if primary_line is not None:
+                    yield _build()
+                    primary_line = None
+                    cont_lines = []
 
-                # Extract message components
-                message_id = self._extract_message_id(line)
-                content = self._extract_content(line, severity)
-                file_ref = self.extract_file_reference(raw_text)
-                category = self._extract_category(message_id)
+                severity = self._detect_severity(line)
+                if severity:
+                    primary_line = line
+                    primary_severity = severity
+                    primary_start = line_num
 
-                messages.append(
-                    Message(
-                        start_line=start_line,
-                        end_line=end_line,
-                        raw_text=raw_text,
-                        content=content,
-                        severity=severity,
-                        message_id=message_id,
-                        category=category,
-                        file_ref=file_ref,
-                    )
-                )
-
-                i = j
-            else:
-                i += 1
-
-        return messages
+            if primary_line is not None:
+                yield _build()
+        finally:
+            f.close()
 
     @hookimpl
     def get_severity_levels(self) -> list[dict]:
